@@ -97,6 +97,31 @@
 //! assert_eq!(parser.recoverable_errors().len(), 2);
 //! ```
 //!
+//! #### `tolerate_at_keyword_placeholders`
+//!
+//! By default, at-keywords are syntax errors in declaration values and selectors.
+//! Enabling this option makes the parser accept them: in values they're parsed
+//! as [`ComponentValue::TokenWithSpan`](crate::ast::ComponentValue), and in
+//! selectors as type or class selector names whose raw text includes the
+//! leading `@`. This is designed for downstream formatters that substitute
+//! template interpolations (e.g. CSS-in-JS `${expr}`) with at-keyword
+//! placeholders before parsing.
+//!
+//! ```rust
+//! use raffia::{ast::*, ParserBuilder, ParserOptions, Syntax};
+//!
+//! let options = ParserOptions {
+//!     tolerate_at_keyword_placeholders: true,
+//!     ..Default::default()
+//! };
+//! let builder = ParserBuilder::new("a { width: @placeholder-0; }")
+//!     .syntax(Syntax::Scss)
+//!     .options(options);
+//! let mut parser = builder.build();
+//!
+//! assert!(parser.parse::<Stylesheet>().is_ok());
+//! ```
+//!
 //! ### Parse Partial Structure
 //!
 //! Sometimes you don't want to parse a full stylesheet.

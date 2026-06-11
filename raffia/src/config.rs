@@ -28,4 +28,15 @@ pub struct ParserOptions {
     /// If enabled, trailing semicolon of each statement will be treated
     /// as recoverable errors, instead of raising a syntax error.
     pub tolerate_semicolon_in_sass: bool,
+
+    /// If enabled, at-keywords (e.g. `@placeholder-0`) are tolerated in
+    /// declaration values and selectors: in values they're parsed as
+    /// [`ComponentValue::TokenWithSpan`](crate::ast::ComponentValue),
+    /// and in selectors as type or class selector names whose raw text
+    /// includes the leading `@`.
+    ///
+    /// This is designed for downstream formatters that substitute template
+    /// interpolations (e.g. CSS-in-JS `${expr}`) with at-keyword placeholders
+    /// before parsing.
+    pub tolerate_at_keyword_placeholders: bool,
 }

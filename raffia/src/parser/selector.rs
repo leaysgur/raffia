@@ -665,7 +665,18 @@ impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for ClassSelector<'s> {
         let (_, dot_span) = expect!(input, Dot);
         let start = dot_span.start;
         let end;
-        let name = if input.syntax == Syntax::Css {
+        let name = if input.options.tolerate_at_keyword_placeholders
+            && matches!(
+                peek!(input),
+                TokenWithSpan {
+                    token: Token::AtKeyword(..),
+                    span,
+                } if span.start == dot_span.end
+            ) {
+            let name = input.parse_at_keyword_placeholder_ident()?;
+            end = name.span().end;
+            name
+        } else if input.syntax == Syntax::Css {
             let (ident, ident_span) = expect_without_ws_or_comments!(input, Ident);
             end = ident_span.end;
             InterpolableIdent::Literal((ident, ident_span).into())
@@ -783,6 +794,16 @@ impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for CompoundSelector<'s> {
                     token: Token::Percent(..),
                     span,
                 } if matches!(input.syntax, Syntax::Scss | Syntax::Sass)
+                    && !util::has_ws(input.source, end, span.start) =>
+                {
+                    let child = input.parse::<SimpleSelector>()?;
+                    end = child.span().end;
+                    children.push(child);
+                }
+                TokenWithSpan {
+                    token: Token::AtKeyword(..),
+                    span,
+                } if input.options.tolerate_at_keyword_placeholders
                     && !util::has_ws(input.source, end, span.start) =>
                 {
                     let child = input.parse::<SimpleSelector>()?;
@@ -1352,6 +1373,22 @@ impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for SelectorList<'s> {
 }
 
 // https://www.w3.org/TR/selectors-4/#ref-for-typedef-simple-selector
+impl<'cmt, 's: 'cmt> Parser<'cmt, 's> {
+    /// Consume an at-keyword token and build an identifier whose raw text
+    /// includes the leading `@`. Only used when
+    /// [`ParserOptions::tolerate_at_keyword_placeholders`](crate::ParserOptions)
+    /// is enabled.
+    fn parse_at_keyword_placeholder_ident(&mut self) -> PResult<InterpolableIdent<'s>> {
+        let TokenWithSpan { span, .. } = bump!(self);
+        let raw = &self.source[span.start..span.end];
+        Ok(InterpolableIdent::Literal(Ident {
+            name: Cow::from(raw),
+            raw,
+            span,
+        }))
+    }
+}
+
 impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for SimpleSelector<'s> {
     fn parse(input: &mut Parser<'cmt, 's>) -> PResult<Self> {
         match peek!(input) {
@@ -1393,6 +1430,23 @@ impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for SimpleSelector<'s> {
                 ..
             } if matches!(input.syntax, Syntax::Scss | Syntax::Sass) => {
                 input.parse().map(SimpleSelector::SassPlaceholder)
+            }
+            TokenWithSpan {
+                token: Token::AtKeyword(..),
+                ..
+            } if input.options.tolerate_at_keyword_placeholders => {
+                let name = input.parse_at_keyword_placeholder_ident()?;
+                let span = name.span().clone();
+                Ok(SimpleSelector::Type(TypeSelector::TagName(
+                    TagNameSelector {
+                        name: WqName {
+                            name,
+                            prefix: None,
+                            span: span.clone(),
+                        },
+                        span,
+                    },
+                )))
             }
             token_with_span => Err(Error {
                 kind: ErrorKind::ExpectSimpleSelector,
@@ -1553,6 +1607,18 @@ impl<'cmt, 's: 'cmt> Parser<'cmt, 's> {
                     end: span.start,
                 },
             })),
+            TokenWithSpan {
+                token: Token::AtKeyword(..),
+                span,
+            } if self.options.tolerate_at_keyword_placeholders && pos < span.start => {
+                Ok(Some(Combinator {
+                    kind: CombinatorKind::Descendant,
+                    span: Span {
+                        start: pos,
+                        end: span.start,
+                    },
+                }))
+            }
             TokenWithSpan {
                 token: Token::GreaterThan(..),
                 ..

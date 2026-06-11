@@ -271,6 +271,9 @@ impl<'cmt, 's: 'cmt> Parser<'cmt, 's> {
             Token::BacktickCode(..) if self.syntax == Syntax::Less => {
                 self.parse().map(ComponentValue::LessJavaScriptSnippet)
             }
+            Token::AtKeyword(..) if self.options.tolerate_at_keyword_placeholders => {
+                Ok(ComponentValue::TokenWithSpan(bump!(self)))
+            }
             _ => Err(Error {
                 kind: ErrorKind::ExpectComponentValue,
                 span: token_with_span.span.clone(),
