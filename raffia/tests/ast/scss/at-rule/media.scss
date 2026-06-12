@@ -4,3 +4,8 @@
 
 @media screen and (width >= 768px) {}
 @media screen and (width >= "#{a < b}") {}
+
+@media screen and #{$sm-only} {}
+@media screen and #{$sm-only, $lg-and-up} {}
+@media (width >= 768px) and #{$extra} {}
+@media not #{$query} {}

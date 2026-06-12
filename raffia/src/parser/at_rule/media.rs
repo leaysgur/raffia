@@ -143,6 +143,19 @@ impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for MediaFeatureComparison {
 
 impl<'cmt, 's: 'cmt> Parse<'cmt, 's> for MediaInParens<'s> {
     fn parse(input: &mut Parser<'cmt, 's>) -> PResult<Self> {
+        // Sass allows an interpolation wherever `<media-in-parens>` is expected,
+        // e.g. `@media screen and #{$query} {}`.
+        if matches!(input.syntax, Syntax::Scss | Syntax::Sass)
+            && matches!(&peek!(input).token, Token::HashLBrace(..))
+            && let InterpolableIdent::SassInterpolated(interpolation) =
+                input.parse_sass_interpolated_ident()?
+        {
+            let span = interpolation.span.clone();
+            return Ok(MediaInParens {
+                kind: MediaInParensKind::SassInterpolation(interpolation),
+                span,
+            });
+        }
         let (_, Span { start, .. }) = expect!(input, LParen);
         let kind = input.parse()?;
         let (_, Span { end, .. }) = expect!(input, RParen);
