@@ -1509,6 +1509,7 @@ pub struct MediaInParens<'s> {
 pub enum MediaInParensKind<'s> {
     MediaCondition(MediaCondition<'s>),
     MediaFeature(Box<MediaFeature<'s>>),
+    SassInterpolation(SassInterpolatedIdent<'s>),
 }
 
 #[derive(Clone, Debug, Spanned, PartialEq)]
